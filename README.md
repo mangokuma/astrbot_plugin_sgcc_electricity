@@ -2,7 +2,7 @@
 
 自动查询国家电网（95598.cn）电费与用电量的 AstrBot 插件：
 
-- 💰 **电费查询**：余额 / 应交金额 / 本年 / 本月用电与电费（卡片图片）
+- 💰 **电费查询**：余额 / 应交金额 / 本年 / 本月用电与电费
 - 📊 **用电统计**：近 7 天 / 30 天每日用电量柱状图
 - ⏰ **缴费提醒**：余额低于阈值自动推送到指定会话（私聊/群均可）
 - 🔐 **智能登录**：Cookie 复用优先，密码登录 + 大模型验证码识别，失败可扫码兜底
@@ -86,7 +86,7 @@ astrbot_plugin_sgcc_electricity/
 ├── main.py            # 插件入口：指令注册、定时任务、消息推送
 ├── config.py          # 配置读取与校验
 ├── storage.py         # SQLite 存储
-├── chart.py           # 电费卡片 + 用电量图表生成
+├── chart.py           # 用电量图表生成
 ├── reminder.py        # 缴费提醒逻辑
 ├── sgcc/
 │   ├── client.py      # Playwright 抓取核心（登录 + 数据提取）
@@ -96,6 +96,7 @@ astrbot_plugin_sgcc_electricity/
 │   └── const.py       # URL 与页面选择器
 ├── metadata.yaml      # 插件元数据 + 配置 schema
 ├── _conf_schema.json  # WebUI 配置页配置项定义
+├── assets/            # 内置 Noto Sans SC 中文字体子集（base64，400/700 字重）
 ├── requirements.txt
 ├── LICENSE            # Apache-2.0 协议全文（含原项目版权声明要求）
 └── README.md

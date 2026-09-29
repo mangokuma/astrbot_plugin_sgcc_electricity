@@ -1,47 +1,97 @@
-"""图表生成（matplotlib，支持 CJK 字体自动探测）。
+"""图表生成（matplotlib，中文字体内置，任何环境均渲染中文）。
 
 - render_daily_chart: 近 N 天每日用电量柱状图
 - render_bill_card:    /电费 指令的电费信息卡片
+
+中文字体为 Noto Sans SC（SIL OFL 1.1，可自由分发）的子集，
+常规/粗体两个字重以 base64 形式内置在 assets/ 下，
+首次使用时解码到临时目录加载，无需宿主机安装任何中文字体。
 """
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
+import tempfile
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Windows / Linux 常见中文字体候选（按优先级）
+_ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
+# 内置字体子集（base64）：(文件名, 解码后的目标文件名)
+_BUNDLED_FONTS = [
+    ("NotoSansSC-400.ttf.b64", "astrbot_sgcc_noto_sans_sc_400.ttf"),
+    ("NotoSansSC-700.ttf.b64", "astrbot_sgcc_noto_sans_sc_700.ttf"),
+]
+
+
+def _bundled_font_paths() -> list[str]:
+    """把内置的 base64 字体解码到临时目录，返回全部 ttf 路径。"""
+    paths: list[str] = []
+    for b64_name, ttf_name in _BUNDLED_FONTS:
+        src = os.path.join(_ASSETS_DIR, b64_name)
+        if not os.path.isfile(src):
+            continue
+        dest = os.path.join(tempfile.gettempdir(), ttf_name)
+        try:
+            if not os.path.isfile(dest):
+                with open(src, "rb") as f:
+                    data = base64.b64decode(f.read())
+                with open(dest, "wb") as f:
+                    f.write(data)
+            paths.append(dest)
+        except Exception as e:
+            logger.warning(f"解压内置中文字体 {b64_name} 失败: {e}")
+    return paths
+
+
+# Windows / Linux 常见中文字体候选（内置字体优先，保证无中文字体的容器也能出中文图）
 _CJK_FONT_CANDIDATES = [
-    r"C:\Windows\Fonts\msyh.ttc",      # 微软雅黑
-    r"C:\Windows\Fonts\simhei.ttf",    # 黑体
-    r"C:\Windows\Fonts\simsun.ttc",    # 宋体
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+    r"C:\Windows\Fonts\msyh.ttc",      # 微软雅黑
+    r"C:\Windows\Fonts\simhei.ttf",    # 黑体
+    r"C:\Windows\Fonts\simsun.ttc",    # 宋体
 ]
 
 
+def _candidate_fonts() -> list[str]:
+    return _bundled_font_paths() + list(_CJK_FONT_CANDIDATES)
+
+
 def _setup_cjk_font():
-    """配置 matplotlib 中文字体，找不到时返回 False（图中将退回英文）。"""
+    """配置 matplotlib 中文字体，优先使用内置字体；返回是否成功。
+
+    内置的 400/700 两个字重全部注册，粗体文字由 matplotlib 按字重匹配。
+    """
     from matplotlib import font_manager
 
-    for path in _CJK_FONT_CANDIDATES:
-        if os.path.isfile(path):
-            try:
-                font_manager.fontManager.addfont(path)
-                font_name = font_manager.FontProperties(fname=path).get_name()
-                import matplotlib
+    candidates = _candidate_fonts()
+    loaded_any = False
+    font_name: Optional[str] = None
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            font_manager.fontManager.addfont(path)
+            name = font_manager.FontProperties(fname=path).get_name()
+            if font_name is None:
+                font_name = name
+            loaded_any = True
+        except Exception as e:
+            logger.warning(f"加载字体 {path} 失败: {e}")
+    if loaded_any and font_name:
+        import matplotlib
 
-                matplotlib.rcParams["font.family"] = font_name
-                matplotlib.rcParams["axes.unicode_minus"] = False
-                return True
-            except Exception as e:
-                logger.warning(f"加载字体 {path} 失败: {e}")
-    logger.warning("未找到中文字体，图表文字可能显示为方块")
+        matplotlib.rcParams["font.family"] = font_name
+        matplotlib.rcParams["axes.unicode_minus"] = False
+        return True
+    logger.warning("未找到可用中文字体，图表文字可能显示为方块")
     return False
 
 
@@ -56,14 +106,13 @@ def render_daily_chart(rows: list[dict[str, Any]], days: int) -> Optional[bytes]
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    _setup_cjk_font()
+    has_cjk = _setup_cjk_font()
 
     dates = [str(r.get("date", ""))[5:] for r in rows]  # 取 MM-DD
     usages = [float(r.get("total_usage") or 0) for r in rows]
     total = sum(usages)
     avg = total / len(usages) if usages else 0
 
-    has_cjk = any(os.path.isfile(p) for p in _CJK_FONT_CANDIDATES)
     if has_cjk:
         title = f"近{days}天每日用电量（度）"
         subtitle = f"合计 {total:.1f} 度，日均 {avg:.2f} 度"
@@ -106,8 +155,7 @@ def render_bill_card(summary: dict[str, Any]) -> Optional[bytes]:
     import matplotlib.pyplot as plt
     from matplotlib.patches import FancyBboxPatch
 
-    _setup_cjk_font()
-    has_cjk = any(os.path.isfile(p) for p in _CJK_FONT_CANDIDATES)
+    has_cjk = _setup_cjk_font()
 
     def num(key: str) -> Optional[float]:
         v = summary.get(key)
@@ -120,7 +168,6 @@ def render_bill_card(summary: dict[str, Any]) -> Optional[bytes]:
     month_usage = num("month_usage")
     month_charge = num("month_charge")
     fetched_at = summary.get("fetched_at", "")
-    user_name = summary.get("user_name", "")
 
     if has_cjk:
         title = "国网电费"
@@ -150,19 +197,16 @@ def render_bill_card(summary: dict[str, Any]) -> Optional[bytes]:
                           facecolor="#F4F7FE", edgecolor="#D6E0F5", linewidth=1.5)
     ax.add_patch(card)
 
-    # 顶部标题
-    ax.text(0.8, 8.9, title, fontsize=17, fontweight="bold", color="#1F3B73",
+    # 顶部标题（不显示任何用户/户号信息）
+    ax.text(0.8, 8.7, title, fontsize=17, fontweight="bold", color="#1F3B73",
             ha="left", va="center")
-    if user_name:
-        ax.text(0.8, 8.25, user_name, fontsize=10.5, color="#7A8BB0",
-                ha="left", va="center")
 
     # 余额大数字
     balance_color = "#E25C5C" if (balance is not None and balance < 20) else "#2F6FD6"
     balance_text = f"{balance:.2f}" if balance is not None else "--"
-    ax.text(0.8, 6.7, balance_text, fontsize=34, fontweight="bold",
+    ax.text(0.8, 6.5, balance_text, fontsize=34, fontweight="bold",
             color=balance_color, ha="left", va="center")
-    ax.text(0.85, 5.75, label_balance, fontsize=11, color="#7A8BB0",
+    ax.text(0.85, 5.55, label_balance, fontsize=11, color="#7A8BB0",
             ha="left", va="center")
 
     # 右侧应交金额
