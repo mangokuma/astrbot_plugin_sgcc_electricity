@@ -1,0 +1,79 @@
+{
+  "phone_number": {
+    "type": "string",
+    "description": "国网登录手机号（95598 账号）",
+    "default": ""
+  },
+  "password": {
+    "type": "string",
+    "description": "国网登录密码",
+    "default": "",
+    "secret": true
+  },
+  "llm_api_key": {
+    "type": "string",
+    "description": "验证码识别用的多模态大模型 API Key（推荐硅基流动 SiliconFlow，需多模态模型，DeepSeek 纯文本模型不可用）",
+    "default": "",
+    "secret": true
+  },
+  "llm_base_url": {
+    "type": "string",
+    "description": "大模型 OpenAI 兼容接口地址",
+    "default": "https://api.siliconflow.cn/v1"
+  },
+  "llm_model": {
+    "type": "string",
+    "description": "验证码识别用的多模态模型名",
+    "default": "Qwen/Qwen3.5-35B-A3B"
+  },
+  "admin_qq": {
+    "type": "string",
+    "description": "管理员 QQ 号，逗号分隔。仅管理员可使用插件指令，二维码登录兜底也推送给管理员",
+    "default": ""
+  },
+  "platform": {
+    "type": "string",
+    "description": "消息平台标识（用于构造管理员的私聊会话，一般保持 aiocqhttp 即可）",
+    "default": "aiocqhttp"
+  },
+  "remind_sessions": {
+    "type": "list",
+    "description": "缴费提醒推送的会话列表（unified_msg_origin），从 AstrBot 管理页会话列表复制，支持私聊和群",
+    "default": []
+  },
+  "remind_threshold": {
+    "type": "float",
+    "description": "余额提醒阈值（元），低于该值自动提醒",
+    "default": 5.0
+  },
+  "query_time": {
+    "type": "string",
+    "description": "每日自动抓取时间（24小时制 HH:MM）",
+    "default": "07:00"
+  },
+  "retention_days": {
+    "type": "int",
+    "description": "每日用电量保留天数（国网限制：未签约智能交费仅支持 7 天）",
+    "default": 7
+  },
+  "login_fallback_qrcode": {
+    "type": "bool",
+    "description": "密码登录失败时，是否推送二维码给管理员扫码兜底登录",
+    "default": true
+  },
+  "qrcode_wait_minutes": {
+    "type": "int",
+    "description": "二维码登录最长等待时间（分钟）",
+    "default": 5
+  },
+  "browser_headless": {
+    "type": "bool",
+    "description": "浏览器是否无头运行（调试时可设为 false 观察操作过程）",
+    "default": true
+  },
+  "retry_wait_time": {
+    "type": "int",
+    "description": "浏览器操作等待时间（秒），网络慢或报错 no such element 时可调大",
+    "default": 10
+  }
+}
