@@ -1,7 +1,7 @@
 """国网电费查询 AstrBot 插件。
 
 指令：
-- /电费            查看最近一次抓取的电费信息卡片（仅管理员）
+- /电费            查看最近一次抓取的电费/用电摘要（仅管理员）
 - /用电统计 [7|30] 近 7/30 天每日用电量图表（默认 7 天）
 - /电费更新        手动触发一次抓取（有冷却时间）
 
@@ -168,7 +168,14 @@ class SGCCPlugin(Star):
             return
 
         self.storage.set_kv("last_manual_fetch", datetime.now().isoformat())
-        yield event.plain_result("✅ 抓取完成\n" + result.summary_text())
+
+        # 抓取结果渲染为电费卡片图片返回（不含户号等用户信息）
+        summary = self.storage.load_summary()
+        png = render_bill_card(summary) if summary else None
+        if png is not None:
+            yield event.chain_result([Comp.Image.fromBytes(png)])
+        else:
+            yield event.plain_result("✅ 抓取完成\n" + result.summary_text())
 
     # ------------------------------------------------------------------
     # 抓取与定时任务

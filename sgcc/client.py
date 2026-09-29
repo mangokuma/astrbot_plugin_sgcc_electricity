@@ -63,8 +63,6 @@ class FetchResult:
 
     def summary_text(self) -> str:
         lines = []
-        name = f"({self.user_name})" if self.user_name else ""
-        lines.append(f"户号 {self.user_id}{name}")
         if self.balance is not None:
             lines.append(f"电费余额: {self.balance:.2f} 元")
         if self.amount_due is not None:
