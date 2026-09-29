@@ -1,0 +1,71 @@
+name: astrbot_plugin_sgcc_electricity
+display_name: 国网电费查询
+author: mangokuma
+desc: 自动查询国家电网电费与用电量：每日定时抓取电费余额、近7天/30天用电统计图表、余额不足自动提醒。数据来自 95598.cn，使用 Playwright + 大模型验证码识别。
+version: "1.0.0"
+repo: "https://github.com/mangokuma/astrbot_plugin_sgcc_electricity"
+short_desc: 国网电费查询 / 用电统计图表 / 缴费提醒
+support_platforms:
+  - aiocqhttp
+astrbot_version: ">=4.16"
+config:
+  phone_number:
+    type: string
+    default: ""
+    description: "国网登录手机号（95598 账号）"
+  password:
+    type: string
+    default: ""
+    description: "国网登录密码"
+  llm_api_key:
+    type: string
+    default: ""
+    description: "验证码识别用的多模态大模型 API Key（推荐硅基流动 SiliconFlow，需多模态模型，DeepSeek 纯文本模型不可用）"
+  llm_base_url:
+    type: string
+    default: "https://api.siliconflow.cn/v1"
+    description: "大模型 OpenAI 兼容接口地址"
+  llm_model:
+    type: string
+    default: "Qwen/Qwen3.5-35B-A3B"
+    description: "验证码识别用的多模态模型名"
+  admin_qq:
+    type: string
+    default: ""
+    description: "管理员 QQ 号，逗号分隔。仅管理员可使用插件指令，二维码登录兜底也推送给管理员"
+  platform:
+    type: string
+    default: "aiocqhttp"
+    description: "消息平台标识（用于构造管理员的私聊会话，一般保持 aiocqhttp 即可）"
+  remind_sessions:
+    type: list
+    default: []
+    description: "缴费提醒推送的会话列表（unified_msg_origin），从 AstrBot 管理页会话列表复制，支持私聊和群"
+  remind_threshold:
+    type: float
+    default: 5.0
+    description: "余额提醒阈值（元），低于该值自动提醒"
+  query_time:
+    type: string
+    default: "07:00"
+    description: "每日自动抓取时间（24小时制 HH:MM）"
+  retention_days:
+    type: int
+    default: 7
+    description: "每日用电量保留天数（国网限制：未签约智能交费仅支持 7 天）"
+  login_fallback_qrcode:
+    type: bool
+    default: true
+    description: "密码登录失败时，是否推送二维码给管理员扫码兜底登录"
+  qrcode_wait_minutes:
+    type: int
+    default: 5
+    description: "二维码登录最长等待时间（分钟）"
+  browser_headless:
+    type: bool
+    default: true
+    description: "浏览器是否无头运行（调试时可设为 false 观察操作过程）"
+  retry_wait_time:
+    type: int
+    default: 10
+    description: "浏览器操作等待时间（秒），网络慢或报错 no such element 时可调大"
