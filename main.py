@@ -249,6 +249,14 @@ class SGCCPlugin(Star):
                 return None
             except Exception as e:
                 logger.error(f"抓取失败: {e}")
+                if "shared libraries" in str(e) or "libnspr4" in str(e):
+                    logger.error(
+                        "浏览器缺少系统依赖库。Docker 环境请在容器内执行: "
+                        "python -m playwright install-deps chromium"
+                        "（或 apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 "
+                        "libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 "
+                        "libgbm1 libasound2 libpango-1.0-0 libpangocairo-1.0-0 libcairo2）"
+                    )
                 return None
 
             # 落库

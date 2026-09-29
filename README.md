@@ -22,6 +22,24 @@ playwright install chromium
 
 > Chromium 体积约 300MB，首次安装需要耐心等待。
 
+#### Docker 部署注意：安装浏览器系统依赖
+
+如果日志报错 `error while loading shared libraries: libnspr4.so`（或 `libnss3.so`、`libgbm.so` 等），说明容器内缺少 Chromium 运行库。进入 AstrBot 容器执行：
+
+```bash
+python -m playwright install-deps chromium
+```
+
+`install-deps` 需要 apt 源可用；如果失败，可手动安装：
+
+```bash
+apt-get update && apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+  libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 \
+  libgbm1 libasound2 libpango-1.0-0 libpangocairo-1.0-0 libcairo2
+```
+
+安装完成后重启 AstrBot 或重载插件。
+
 ### 2. 启用插件
 
 在 AstrBot Web 管理页面「插件」中启用本插件。
