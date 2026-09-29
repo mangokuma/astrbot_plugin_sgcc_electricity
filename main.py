@@ -99,8 +99,9 @@ class SGCCPlugin(Star):
             yield event.plain_result(NO_PERMISSION)
             return
 
+        # 只取紧跟命令名的数字参数，避免引用消息等内容里的数字干扰
         text = event.message_str or ""
-        match = re.search(r"(\d+)", text)
+        match = re.search(r"用电统计\s*(\d+)", text)
         days = int(match.group(1)) if match else 7
         if days not in (7, 30):
             yield event.plain_result("用法: /用电统计 [7|30]，不带参数默认近 7 天。")
