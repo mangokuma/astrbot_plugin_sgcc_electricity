@@ -1,7 +1,7 @@
 """国网电费查询 AstrBot 插件。
 
 指令：
-- /电费            查看最近一次抓取的电费/用电摘要（仅管理员）
+- /电费            查看最近一次抓取的电费信息卡片（仅管理员）
 - /用电统计 [7|30] 近 7/30 天每日用电量图表（默认 7 天）
 - /电费更新        手动触发一次抓取（有冷却时间）
 
@@ -22,7 +22,7 @@ from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 import astrbot.api.message_components as Comp
 
-from .chart import render_daily_chart
+from .chart import render_bill_card, render_daily_chart
 from .config import PluginConfig
 from .reminder import maybe_remind
 from .sgcc.client import FetchResult, SGCCClient, result_to_json
@@ -87,26 +87,11 @@ class SGCCPlugin(Star):
             yield event.plain_result("暂无数据，请先使用 /电费更新 抓取一次。")
             return
 
-        lines = ["⚡ 国网电费信息"]
-        if summary.get("user_name"):
-            lines.append(f"用户: {summary['user_name']}")
-        if summary.get("user_id"):
-            lines.append(f"户号: {summary['user_id']}")
-        if summary.get("balance") is not None:
-            lines.append(f"电费余额: {summary['balance']:.2f} 元")
-        if summary.get("amount_due") is not None:
-            lines.append(f"应交金额: {summary['amount_due']:.2f} 元")
-        if summary.get("yearly_usage") is not None:
-            lines.append(
-                f"本年用电: {summary['yearly_usage']:.0f} 度 / "
-                f"{summary.get('yearly_charge') or 0:.2f} 元")
-        if summary.get("month_usage") is not None:
-            lines.append(
-                f"本月用电: {summary['month_usage']:.1f} 度 / "
-                f"{summary.get('month_charge') or 0:.2f} 元")
-        lines.append(f"数据时间: {summary.get('fetched_at', '未知')}")
-        lines.append("（使用 /电费更新 可重新抓取，/用电统计 查看用电图表）")
-        yield event.plain_result("\n".join(lines))
+        png = render_bill_card(summary)
+        if png is None:
+            yield event.plain_result("电费卡片生成失败，请查看日志。")
+            return
+        yield event.chain_result([Comp.Image.fromBytes(png)])
 
     @filter.command("用电统计")
     async def cmd_usage(self, event: AstrMessageEvent):
@@ -136,8 +121,7 @@ class SGCCPlugin(Star):
                 f"未能获取到每日用电量数据。注意：未签约智能交费的账号仅支持近 7 天查询。")
             return
 
-        user_id = (self.storage.load_summary() or {}).get("user_id", "")
-        png = render_daily_chart(rows, days, user_id=user_id)
+        png = render_daily_chart(rows, days)
         if png is None:
             yield event.plain_result("图表生成失败。")
             return

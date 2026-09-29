@@ -1,4 +1,8 @@
-"""用电量统计图表生成（matplotlib，支持 CJK 字体自动探测）。"""
+"""图表生成（matplotlib，支持 CJK 字体自动探测）。
+
+- render_daily_chart: 近 N 天每日用电量柱状图
+- render_bill_card:    /电费 指令的电费信息卡片
+"""
 
 from __future__ import annotations
 
@@ -41,8 +45,7 @@ def _setup_cjk_font():
     return False
 
 
-def render_daily_chart(rows: list[dict[str, Any]], days: int,
-                       user_id: str = "") -> Optional[bytes]:
+def render_daily_chart(rows: list[dict[str, Any]], days: int) -> Optional[bytes]:
     """生成近 N 天每日用电量柱状图，返回 PNG 字节；无数据返回 None。"""
     if not rows:
         return None
@@ -87,12 +90,113 @@ def render_daily_chart(rows: list[dict[str, Any]], days: int,
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                 f"{usage:.1f}", ha="center", va="bottom", fontsize=8)
 
-    if user_id:
-        fig.text(0.99, 0.01, f"户号 {user_id}", ha="right", va="bottom",
-                 fontsize=8, color="#888888")
-
     fig.tight_layout()
     buf = io.BytesIO()
     fig.savefig(buf, format="PNG", bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def render_bill_card(summary: dict[str, Any]) -> Optional[bytes]:
+    """生成 /电费 指令的电费信息卡片图，返回 PNG 字节。"""
+    import io
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import FancyBboxPatch
+
+    _setup_cjk_font()
+    has_cjk = any(os.path.isfile(p) for p in _CJK_FONT_CANDIDATES)
+
+    def num(key: str) -> Optional[float]:
+        v = summary.get(key)
+        return float(v) if v is not None else None
+
+    balance = num("balance")
+    amount_due = num("amount_due")
+    yearly_usage = num("yearly_usage")
+    yearly_charge = num("yearly_charge")
+    month_usage = num("month_usage")
+    month_charge = num("month_charge")
+    fetched_at = summary.get("fetched_at", "")
+    user_name = summary.get("user_name", "")
+
+    if has_cjk:
+        title = "国网电费"
+        label_balance = "电费余额"
+        label_due = "应交金额"
+        label_yearly = "本年用电"
+        label_month = "本月用电"
+        unit_yuan, unit_kwh = "元", "度"
+        label_time = "数据时间"
+    else:
+        title = "Electricity Bill"
+        label_balance = "Balance"
+        label_due = "Amount Due"
+        label_yearly = "Year"
+        label_month = "Month"
+        unit_yuan, unit_kwh = "CNY", "kWh"
+        label_time = "Updated"
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6), dpi=150)
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 10)
+    ax.axis("off")
+
+    # 卡片背景
+    card = FancyBboxPatch((0.3, 0.3), 9.4, 9.4,
+                          boxstyle="round,pad=0.15,rounding_size=0.45",
+                          facecolor="#F4F7FE", edgecolor="#D6E0F5", linewidth=1.5)
+    ax.add_patch(card)
+
+    # 顶部标题
+    ax.text(0.8, 8.9, title, fontsize=17, fontweight="bold", color="#1F3B73",
+            ha="left", va="center")
+    if user_name:
+        ax.text(0.8, 8.25, user_name, fontsize=10.5, color="#7A8BB0",
+                ha="left", va="center")
+
+    # 余额大数字
+    balance_color = "#E25C5C" if (balance is not None and balance < 20) else "#2F6FD6"
+    balance_text = f"{balance:.2f}" if balance is not None else "--"
+    ax.text(0.8, 6.7, balance_text, fontsize=34, fontweight="bold",
+            color=balance_color, ha="left", va="center")
+    ax.text(0.85, 5.75, label_balance, fontsize=11, color="#7A8BB0",
+            ha="left", va="center")
+
+    # 右侧应交金额
+    due_text = f"{amount_due:.2f} {unit_yuan}" if amount_due is not None else "--"
+    ax.text(9.2, 7.0, due_text, fontsize=15, fontweight="bold", color="#1F3B73",
+            ha="right", va="center")
+    ax.text(9.2, 6.3, label_due, fontsize=10.5, color="#7A8BB0",
+            ha="right", va="center")
+
+    # 分隔线
+    ax.plot([0.8, 9.2], [5.0, 5.0], color="#D6E0F5", linewidth=1.2)
+
+    # 本年 / 本月用电
+    def fmt_usage(usage: Optional[float], charge: Optional[float]) -> str:
+        if usage is None:
+            return "--"
+        if charge is not None:
+            return f"{usage:.1f} {unit_kwh} / {charge:.2f} {unit_yuan}"
+        return f"{usage:.1f} {unit_kwh}"
+
+    ax.text(0.8, 3.9, label_yearly, fontsize=11, color="#7A8BB0", ha="left", va="center")
+    ax.text(0.8, 3.25, fmt_usage(yearly_usage, yearly_charge),
+            fontsize=13.5, fontweight="bold", color="#1F3B73", ha="left", va="center")
+
+    ax.text(0.8, 2.15, label_month, fontsize=11, color="#7A8BB0", ha="left", va="center")
+    ax.text(0.8, 1.5, fmt_usage(month_usage, month_charge),
+            fontsize=13.5, fontweight="bold", color="#1F3B73", ha="left", va="center")
+
+    # 底部数据时间
+    ax.text(9.2, 0.85, f"{label_time}: {fetched_at}", fontsize=9, color="#9AA7C2",
+            ha="right", va="center")
+
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="PNG", bbox_inches="tight", facecolor="white")
     plt.close(fig)
     return buf.getvalue()
