@@ -56,7 +56,10 @@ class SGCCPlugin(Star):
     async def initialize(self):
         self._loop = asyncio.get_running_loop()
         self._task = asyncio.create_task(self._scheduler_loop())
-        logger.info(f"每日自动抓取任务已注册，执行时间 {self.cfg.query_time}")
+        tz_name = datetime.now().astimezone().tzname()
+        logger.info(
+            f"每日自动抓取任务已注册，执行时间 {self.cfg.query_time}"
+            f"（容器时区 {tz_name}，当前时间 {datetime.now():%Y-%m-%d %H:%M:%S}）")
 
     async def terminate(self):
         if self._task is not None:
@@ -281,17 +284,44 @@ class SGCCPlugin(Star):
             logger.error(f"缴费提醒发送失败: {e}")
 
     async def _scheduler_loop(self):
-        """每日定时抓取。"""
+        """每日定时抓取。单轮异常不得中断循环。"""
         while True:
-            wait_seconds = self._seconds_until_next_run()
-            logger.info(f"距离下次自动抓取还有 {wait_seconds / 3600:.1f} 小时")
-            await asyncio.sleep(wait_seconds)
+            try:
+                wait_seconds = self._seconds_until_next_run()
+                logger.info(f"距离下次自动抓取还有 {wait_seconds / 3600:.1f} 小时")
+                await asyncio.sleep(wait_seconds)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("定时抓取调度异常，1 分钟后重试")
+                await asyncio.sleep(60)
+                continue
+
             problems = self.cfg.validate()
             if problems:
                 logger.warning("配置不完整，跳过本次自动抓取：" + "；".join(problems))
                 continue
+
             logger.info("开始每日自动抓取")
-            await self._do_fetch(is_manual=False)
+            try:
+                result = await self._do_fetch(is_manual=False)
+            except Exception:
+                logger.exception("每日自动抓取发生未捕获异常")
+                result = None
+            if result is None:
+                await self._notify_admin(
+                    f"⚠️ 国网每日自动抓取失败（{datetime.now():%Y-%m-%d}），"
+                    f"数据未更新，请查看 AstrBot 日志排查。")
+            else:
+                logger.info("每日自动抓取完成")
+
+    async def _notify_admin(self, text: str):
+        """向管理员私聊发送一条通知（失败提醒用）。"""
+        try:
+            await self._send_to_sessions(
+                self._admin_sessions(), MessageChain([Comp.Plain(text)]))
+        except Exception as e:
+            logger.error(f"管理员通知发送失败: {e}")
 
     def _seconds_until_next_run(self) -> float:
         try:

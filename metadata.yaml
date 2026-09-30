@@ -2,7 +2,7 @@ name: astrbot_plugin_sgcc_electricity
 display_name: 国网电费查询
 author: Kimi
 desc: 自动查询国家电网电费与用电量：每日定时抓取电费余额、近7天/30天用电统计图表、余额不足自动提醒。数据来自 95598.cn，使用 Playwright + 大模型验证码识别。
-version: "1.0.7"
+version: "1.0.8"
 repo: "https://github.com/mangokuma/astrbot_plugin_sgcc_electricity"
 short_desc: 国网电费查询 / 用电统计图表 / 缴费提醒
 support_platforms:
